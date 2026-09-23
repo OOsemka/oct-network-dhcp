@@ -90,6 +90,8 @@ export type DhcpServerInventoryItem = {
 
 const MANAGED_BY = 'oct-network-dhcp';
 const DHCP_SERVER_IMAGE = 'quay.io/cjanisze/oct-network-dhcp-server:1.0.0-ocp4.22';
+const DHCP_SCC_NAME = 'oct-dhcp-netraw';
+const DHCP_CLUSTERROLE_NAME = 'oct-dhcp-netraw-use';
 
 /* ------------------------------------------------------------------ */
 /*  IP validation helpers                                              */
@@ -315,6 +317,57 @@ export function buildDhcpServiceAccount(opts: {
   };
 }
 
+export function buildDhcpScc(): Record<string, unknown> {
+  return {
+    apiVersion: 'security.openshift.io/v1',
+    kind: 'SecurityContextConstraints',
+    metadata: {
+      name: DHCP_SCC_NAME,
+      labels: {
+        'app.kubernetes.io/managed-by': MANAGED_BY,
+      },
+    },
+    allowedCapabilities: ['NET_RAW', 'NET_BIND_SERVICE', 'NET_ADMIN'],
+    allowPrivilegeEscalation: true,
+    allowPrivilegedContainer: false,
+    allowHostDirVolumePlugin: false,
+    allowHostIPC: false,
+    allowHostNetwork: false,
+    allowHostPID: false,
+    allowHostPorts: false,
+    defaultAddCapabilities: null,
+    requiredDropCapabilities: ['MKNOD'],
+    fsGroup: { type: 'RunAsAny' },
+    runAsUser: { type: 'RunAsAny' },
+    seLinuxContext: { type: 'MustRunAs' },
+    supplementalGroups: { type: 'RunAsAny' },
+    volumes: ['configMap', 'emptyDir', 'projected', 'secret', 'downwardAPI', 'persistentVolumeClaim'],
+    users: [],
+    groups: [],
+  };
+}
+
+export function buildDhcpSccClusterRole(): Record<string, unknown> {
+  return {
+    apiVersion: 'rbac.authorization.k8s.io/v1',
+    kind: 'ClusterRole',
+    metadata: {
+      name: DHCP_CLUSTERROLE_NAME,
+      labels: {
+        'app.kubernetes.io/managed-by': MANAGED_BY,
+      },
+    },
+    rules: [
+      {
+        apiGroups: ['security.openshift.io'],
+        resources: ['securitycontextconstraints'],
+        resourceNames: [DHCP_SCC_NAME],
+        verbs: ['use'],
+      },
+    ],
+  };
+}
+
 export function buildDhcpSccRoleBinding(opts: {
   name: string;
   namespace: string;
@@ -333,7 +386,7 @@ export function buildDhcpSccRoleBinding(opts: {
     roleRef: {
       apiGroup: 'rbac.authorization.k8s.io',
       kind: 'ClusterRole',
-      name: 'system:openshift:scc:anyuid',
+      name: DHCP_CLUSTERROLE_NAME,
     },
     subjects: [
       {
@@ -413,8 +466,9 @@ export function buildDhcpDeployment(opts: {
                 },
               ],
               securityContext: {
+                runAsUser: 0,
                 capabilities: {
-                  add: ['NET_RAW'],
+                  add: ['NET_RAW', 'NET_BIND_SERVICE', 'NET_ADMIN'],
                 },
               },
               resources: {

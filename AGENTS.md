@@ -33,8 +33,12 @@ No sidecar for the plugin. The plugin creates Deployments that run a companion d
 
 ## What this plugin creates
 
+- **SecurityContextConstraints** `oct-dhcp-netraw` — custom cluster-wide SCC allowing `NET_RAW`, `NET_BIND_SERVICE`, and `NET_ADMIN` capabilities (created once, reused by all DHCP servers)
+- **ClusterRole** `oct-dhcp-netraw-use` — grants `use` verb on the custom SCC (created once)
+- **ServiceAccount** per DHCP server — scoped to the target namespace
+- **ClusterRoleBinding** per DHCP server — binds the ServiceAccount to the custom SCC ClusterRole (automatically cleaned up on delete)
 - **ConfigMap** with `dnsmasq.conf` content for DHCP server configuration
-- **Deployment** running the `oct-network-dhcp-server` (dnsmasq) container, attached to a NAD network via Multus annotation, with `NET_RAW` capability
+- **Deployment** running the `oct-network-dhcp-server` (dnsmasq) container as root (UID 0), attached to a NAD network via Multus annotation, with `NET_RAW`, `NET_BIND_SERVICE`, and `NET_ADMIN` capabilities
 - Labels: `app.kubernetes.io/managed-by: oct-network-dhcp`, `oct-dhcp/nad-name`, `oct-dhcp/nad-namespace`
 
 ## Companion images
@@ -57,14 +61,20 @@ The discovery-service/dnsmasq server version (`1.0.0`) is independent of the plu
 | `ConfigMap` (v1) | namespaced | Store dnsmasq.conf configuration |
 | `VirtualMachineInstance` (kubevirt.io/v1) | namespaced | Discover VM MACs for DHCP reservations |
 | `Pod` (v1) | namespaced | Monitor DHCP server pod status |
+| `SecurityContextConstraints` (security.openshift.io/v1) | cluster | Create the `oct-dhcp-netraw` SCC |
+| `ClusterRole` (rbac.authorization.k8s.io/v1) | cluster | Create the `oct-dhcp-netraw-use` role |
 
 ## DHCP server architecture
 
 Each DHCP server consists of:
-1. A **ConfigMap** containing `dnsmasq.conf` with pool range, gateway, DNS, and static reservations
-2. A **Deployment** running the `oct-network-dhcp-server` image (dnsmasq), attached to the target NAD network via Multus `k8s.v1.cni.cncf.io/networks` annotation with a static IP
-3. An **emptyDir** volume at `/var/lib/dnsmasq/` for the lease file
-4. `securityContext.capabilities.add: ['NET_RAW']` — dnsmasq needs raw sockets for DHCP
+1. A **SecurityContextConstraints** `oct-dhcp-netraw` (cluster-scoped, shared by all DHCP servers) — allows `NET_RAW`, `NET_BIND_SERVICE`, `NET_ADMIN`
+2. A **ClusterRole** `oct-dhcp-netraw-use` (cluster-scoped, shared) — grants `use` on the SCC
+3. A **ServiceAccount** per server (namespaced)
+4. A **ClusterRoleBinding** per server — binds the SA to the ClusterRole
+5. A **ConfigMap** containing `dnsmasq.conf` with pool range, gateway, DNS, and static reservations
+6. A **Deployment** running the `oct-network-dhcp-server` image (dnsmasq) as root (UID 0), attached to the target NAD network via Multus `k8s.v1.cni.cncf.io/networks` annotation with a static IP
+7. An **emptyDir** volume at `/var/lib/dnsmasq/` for the lease file
+8. `securityContext.capabilities.add: ['NET_RAW', 'NET_BIND_SERVICE', 'NET_ADMIN']` and `runAsUser: 0` — dnsmasq needs raw sockets, privileged port 67 binding, and network administration
 
 ## OpenShift and extension versions
 

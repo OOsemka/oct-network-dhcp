@@ -37,7 +37,7 @@ import {
 } from '@patternfly/react-core';
 import React, { FC, useCallback, useEffect, useMemo, useState } from 'react';
 
-import { ConfigMapModel, DeploymentModel, ServiceAccountModel, ClusterRoleBindingModel } from '../utils/k8s-resources';
+import { ConfigMapModel, DeploymentModel, ServiceAccountModel, ClusterRoleBindingModel, ClusterRoleModel, SecurityContextConstraintsModel } from '../utils/k8s-resources';
 import {
   DhcpServerConfig,
   NetworkAttachmentDefinitionKind,
@@ -45,6 +45,8 @@ import {
   buildDhcpConfigMap,
   buildDhcpDeployment,
   buildDhcpServiceAccount,
+  buildDhcpScc,
+  buildDhcpSccClusterRole,
   buildDhcpSccRoleBinding,
   cidrToNetmask,
   getK8sErrorMessage,
@@ -181,6 +183,8 @@ const CreateDhcpTab: FC<CreateDhcpTabProps> = ({ nads, namespaces }) => {
   const previewContent = useMemo(() => {
     if (!canCreate || !selectedNadObj) return '';
     const config = buildConfig();
+    const scc = buildDhcpScc();
+    const clusterRole = buildDhcpSccClusterRole();
     const sa = buildDhcpServiceAccount({
       name: serverName.trim(),
       namespace: targetNamespace,
@@ -206,6 +210,10 @@ const CreateDhcpTab: FC<CreateDhcpTabProps> = ({ nads, namespaces }) => {
       configMapName: serverName.trim(),
     });
     return (
+      toYaml(scc as Record<string, unknown>) +
+      '---\n' +
+      toYaml(clusterRole as Record<string, unknown>) +
+      '---\n' +
       toYaml(sa as Record<string, unknown>) +
       '---\n' +
       toYaml(crb as Record<string, unknown>) +
@@ -251,6 +259,28 @@ const CreateDhcpTab: FC<CreateDhcpTabProps> = ({ nads, namespaces }) => {
         namespace: targetNamespace,
       });
 
+      const sccData = buildDhcpScc();
+      const clusterRoleData = buildDhcpSccClusterRole();
+      try {
+        dashboardLogger.info(LOG_ACTION, 'Ensuring SCC oct-dhcp-netraw exists');
+        await k8sCreate({
+          model: SecurityContextConstraintsModel,
+          data: sccData as unknown as K8sResourceCommon,
+        });
+      } catch (sccErr: unknown) {
+        if (!(sccErr as { code?: number })?.code || (sccErr as { code: number }).code !== 409) throw sccErr;
+      }
+
+      try {
+        dashboardLogger.info(LOG_ACTION, 'Ensuring ClusterRole oct-dhcp-netraw-use exists');
+        await k8sCreate({
+          model: ClusterRoleModel,
+          data: clusterRoleData as unknown as K8sResourceCommon,
+        });
+      } catch (crErr: unknown) {
+        if (!(crErr as { code?: number })?.code || (crErr as { code: number }).code !== 409) throw crErr;
+      }
+
       dashboardLogger.info(LOG_ACTION, 'Creating ServiceAccount', `${targetNamespace}/${serverName.trim()}`);
       await k8sCreate({
         model: ServiceAccountModel,
@@ -258,7 +288,7 @@ const CreateDhcpTab: FC<CreateDhcpTabProps> = ({ nads, namespaces }) => {
         ns: targetNamespace,
       });
 
-      dashboardLogger.info(LOG_ACTION, 'Creating ClusterRoleBinding for anyuid SCC', serverName.trim());
+      dashboardLogger.info(LOG_ACTION, 'Creating ClusterRoleBinding for DHCP SCC', serverName.trim());
       await k8sCreate({
         model: ClusterRoleBindingModel,
         data: crbData as unknown as K8sResourceCommon,
@@ -670,9 +700,9 @@ const CreateDhcpTab: FC<CreateDhcpTabProps> = ({ nads, namespaces }) => {
                 <Alert
                   variant="info"
                   isInline
-                  title={t('NET_RAW capability')}
+                  title={t('Security capabilities')}
                 >
-                  {t('The DHCP server will be granted the anyuid SCC via a ClusterRoleBinding to allow dnsmasq raw sockets (NET_RAW capability). The binding is automatically cleaned up when the server is deleted.')}
+                  {t('The DHCP server requires NET_RAW, NET_BIND_SERVICE, and NET_ADMIN capabilities. A dedicated SCC (oct-dhcp-netraw) will be created cluster-wide and bound to the server\'s ServiceAccount. The per-server ClusterRoleBinding is automatically cleaned up when the server is deleted.')}
                 </Alert>
               </StackItem>
 

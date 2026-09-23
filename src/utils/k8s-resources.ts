@@ -103,3 +103,15 @@ export const ClusterRoleBindingModel: K8sModel = {
   plural: 'clusterrolebindings',
   namespaced: false,
 };
+
+/** security.openshift.io v1 SecurityContextConstraints. */
+export const SecurityContextConstraintsModel: K8sModel = {
+  apiVersion: 'v1',
+  apiGroup: 'security.openshift.io',
+  kind: 'SecurityContextConstraints',
+  abbr: 'SCC',
+  label: 'SecurityContextConstraints',
+  labelPlural: 'SecurityContextConstraints',
+  plural: 'securitycontextconstraints',
+  namespaced: false,
+};
