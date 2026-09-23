@@ -1,6 +1,6 @@
 {
   "name": "oct-network-dhcp",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Community project. Network DHCP Console plugin. Not officially supported by Red Hat.",
   "private": true,
   "license": "Apache-2.0",
@@ -37,7 +37,7 @@
   },
   "consolePlugin": {
     "name": "oct-network-dhcp",
-    "version": "1.0.4",
+    "version": "1.0.5",
     "displayName": "Network DHCP",
     "description": "Community project. Create dnsmasq DHCP servers on NAD VLAN networks. Not officially supported by Red Hat.",
     "exposedModules": {

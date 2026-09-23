@@ -1,6 +1,7 @@
 import {
   K8sResourceCommon,
   k8sDelete,
+  k8sPatch,
   k8sUpdate,
 } from '@openshift-console/dynamic-plugin-sdk';
 import { useTranslation } from 'react-i18next';
@@ -143,31 +144,21 @@ const ManageDhcpTab: FC<ManageDhcpTabProps> = ({ inventory, vmis, rawConfigMaps 
       });
 
       dashboardLogger.info(LOG_ACTION, 'Restarting deployment', selected.deploymentName);
-      const depResource = {
-        apiVersion: 'apps/v1',
-        kind: 'Deployment',
-        metadata: {
-          name: selected.deploymentName,
-          namespace: selected.namespace,
-        },
-      };
-      const patchedDep = {
-        ...depResource,
-        spec: {
-          template: {
-            metadata: {
-              annotations: {
-                'oct-dhcp/restart-trigger': new Date().toISOString(),
-              },
-            },
-          },
-        },
-      };
-      await k8sUpdate({
+      await k8sPatch({
         model: DeploymentModel,
-        data: patchedDep as unknown as K8sResourceCommon,
-        ns: selected.namespace,
-        name: selected.deploymentName,
+        resource: {
+          metadata: {
+            name: selected.deploymentName,
+            namespace: selected.namespace,
+          },
+        } as K8sResourceCommon,
+        data: [
+          {
+            op: 'add',
+            path: '/spec/template/metadata/annotations/oct-dhcp~1restart-trigger',
+            value: new Date().toISOString(),
+          },
+        ],
       });
 
       setSaveSuccess(t('Settings saved. Pod will restart with new configuration.'));
