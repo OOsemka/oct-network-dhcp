@@ -21,8 +21,12 @@ import {
   FormHelperText,
   HelperText,
   HelperTextItem,
+  Divider,
+  MenuSearch,
+  MenuSearchInput,
   MenuToggle,
   NumberInput,
+  SearchInput,
   Select,
   SelectList,
   SelectOption,
@@ -62,10 +66,12 @@ const CreateDhcpTab: FC<CreateDhcpTabProps> = ({ nads, namespaces }) => {
   const { t } = useTranslation('plugin__oct-network-dhcp');
 
   /* ---- form state ---- */
-  const [selectedNad, setSelectedNad] = useState('');
-  const [nadSelectOpen, setNadSelectOpen] = useState(false);
   const [targetNamespace, setTargetNamespace] = useState('');
   const [nsSelectOpen, setNsSelectOpen] = useState(false);
+  const [nsFilter, setNsFilter] = useState('');
+  const [selectedNad, setSelectedNad] = useState('');
+  const [nadSelectOpen, setNadSelectOpen] = useState(false);
+  const [nadFilter, setNadFilter] = useState('');
 
   const [serverIp, setServerIp] = useState('');
   const [cidrPrefix, setCidrPrefix] = useState(24);
@@ -81,30 +87,38 @@ const CreateDhcpTab: FC<CreateDhcpTabProps> = ({ nads, namespaces }) => {
   const [createError, setCreateError] = useState<string | null>(null);
   const [createSuccess, setCreateSuccess] = useState<string | null>(null);
 
-  /* ---- derived NAD data ---- */
+  /* ---- derived NAD data (filtered by selected namespace + search) ---- */
   const nadOptions = useMemo(() => {
-    return nads.map((nad) => {
-      const info = parseNadBridge(nad);
-      const ovn = isOvnNad(nad);
-      const label = `${nad.metadata.namespace}/${nad.metadata.name}`;
-      const desc = ovn
-        ? 'OVN'
-        : info.bridgeName
-          ? `Bridge: ${info.bridgeName}${info.vlanId !== undefined ? `, VLAN ${info.vlanId}` : ''}`
-          : info.type || '';
-      return { key: label, nad, description: desc, isOvn: ovn };
-    });
-  }, [nads]);
+    const filtered = targetNamespace
+      ? nads.filter((nad) => nad.metadata.namespace === targetNamespace)
+      : nads;
+    const q = nadFilter.trim().toLowerCase();
+    return filtered
+      .map((nad) => {
+        const info = parseNadBridge(nad);
+        const ovn = isOvnNad(nad);
+        const label = `${nad.metadata.namespace}/${nad.metadata.name}`;
+        const desc = ovn
+          ? 'OVN'
+          : info.bridgeName
+            ? `Bridge: ${info.bridgeName}${info.vlanId !== undefined ? `, VLAN ${info.vlanId}` : ''}`
+            : info.type || '';
+        return { key: label, nad, description: desc, isOvn: ovn };
+      })
+      .filter((opt) => !q || opt.key.toLowerCase().includes(q) || opt.description.toLowerCase().includes(q))
+      .sort((a, b) => a.key.localeCompare(b.key));
+  }, [nads, targetNamespace, nadFilter]);
 
   const selectedNadObj = useMemo(
     () => nadOptions.find((o) => o.key === selectedNad)?.nad,
     [nadOptions, selectedNad],
   );
 
-  const namespaceNames = useMemo(
-    () => (namespaces || []).map((ns) => ns.metadata.name).sort(),
-    [namespaces],
-  );
+  const namespaceNames = useMemo(() => {
+    const all = (namespaces || []).map((ns) => ns.metadata.name).sort();
+    const q = nsFilter.trim().toLowerCase();
+    return q ? all.filter((ns) => ns.toLowerCase().includes(q)) : all;
+  }, [namespaces, nsFilter]);
 
   /* ---- auto-suggest name ---- */
   useEffect(() => {
@@ -124,12 +138,18 @@ const CreateDhcpTab: FC<CreateDhcpTabProps> = ({ nads, namespaces }) => {
     }
   }, [serverIp, cidrPrefix]);
 
-  /* ---- auto-set target namespace from NAD ---- */
+  /* ---- clear NAD when namespace changes ---- */
+  const prevNsRef = React.useRef(targetNamespace);
   useEffect(() => {
-    if (selectedNadObj && !targetNamespace) {
-      setTargetNamespace(selectedNadObj.metadata.namespace);
+    if (prevNsRef.current !== targetNamespace) {
+      const currentNadNs = selectedNadObj?.metadata.namespace;
+      if (currentNadNs && currentNadNs !== targetNamespace) {
+        setSelectedNad('');
+        setNameManual(false);
+      }
+      prevNsRef.current = targetNamespace;
     }
-  }, [selectedNadObj, targetNamespace]);
+  }, [targetNamespace, selectedNadObj]);
 
   /* ---- validation ---- */
   const canCreate = useMemo(() => {
@@ -244,6 +264,8 @@ const CreateDhcpTab: FC<CreateDhcpTabProps> = ({ nads, namespaces }) => {
     setCreateError(null);
     setSelectedNad('');
     setTargetNamespace('');
+    setNadFilter('');
+    setNsFilter('');
     setServerIp('');
     setPoolStart('');
     setPoolEnd('');
@@ -254,70 +276,26 @@ const CreateDhcpTab: FC<CreateDhcpTabProps> = ({ nads, namespaces }) => {
 
   return (
     <Stack hasGutter>
-      {/* NAD Selection Card */}
+      {/* Namespace + NAD Selection Card */}
       <StackItem>
         <Card>
           <CardTitle>
-            <Title headingLevel="h3">{t('NAD Selection')}</Title>
+            <Title headingLevel="h3">{t('Network Selection')}</Title>
           </CardTitle>
           <CardBody>
             <Form>
-              <FormGroup label={t('Network Attachment Definition')} fieldId="netdhcp-nad" isRequired>
-                <Select
-                  id="netdhcp-nad"
-                  isOpen={nadSelectOpen}
-                  onOpenChange={setNadSelectOpen}
-                  onSelect={(_e, value) => {
-                    setSelectedNad(value as string);
-                    setNadSelectOpen(false);
-                    setNameManual(false);
-                  }}
-                  selected={selectedNad}
-                  toggle={(toggleRef) => (
-                    <MenuToggle
-                      ref={toggleRef}
-                      onClick={() => setNadSelectOpen(!nadSelectOpen)}
-                      isExpanded={nadSelectOpen}
-                      style={{ width: '100%' }}
-                    >
-                      {selectedNad || t('Select a NAD')}
-                    </MenuToggle>
-                  )}
-                >
-                  <SelectList>
-                    {nadOptions.map((opt) => (
-                      <SelectOption
-                        key={opt.key}
-                        value={opt.key}
-                        description={opt.description}
-                      >
-                        {opt.key}
-                      </SelectOption>
-                    ))}
-                    {nadOptions.length === 0 && (
-                      <SelectOption isDisabled value="">
-                        {t('No NADs found')}
-                      </SelectOption>
-                    )}
-                  </SelectList>
-                </Select>
-                <FormHelperText>
-                  <HelperText>
-                    <HelperTextItem>
-                      {t('Select the NAD network where the DHCP server will operate.')}
-                    </HelperTextItem>
-                  </HelperText>
-                </FormHelperText>
-              </FormGroup>
-
-              <FormGroup label={t('Target Namespace')} fieldId="netdhcp-namespace" isRequired>
+              <FormGroup label={t('Namespace')} fieldId="netdhcp-namespace" isRequired>
                 <Select
                   id="netdhcp-namespace"
                   isOpen={nsSelectOpen}
-                  onOpenChange={setNsSelectOpen}
+                  onOpenChange={(open) => {
+                    setNsSelectOpen(open);
+                    if (!open) setNsFilter('');
+                  }}
                   onSelect={(_e, value) => {
                     setTargetNamespace(value as string);
                     setNsSelectOpen(false);
+                    setNsFilter('');
                   }}
                   selected={targetNamespace}
                   toggle={(toggleRef) => (
@@ -331,14 +309,105 @@ const CreateDhcpTab: FC<CreateDhcpTabProps> = ({ nads, namespaces }) => {
                     </MenuToggle>
                   )}
                 >
+                  <MenuSearch>
+                    <MenuSearchInput>
+                      <SearchInput
+                        value={nsFilter}
+                        onChange={(_e, val) => setNsFilter(val)}
+                        onClear={() => setNsFilter('')}
+                        placeholder={t('Filter namespaces...')}
+                        aria-label={t('Filter namespaces')}
+                      />
+                    </MenuSearchInput>
+                  </MenuSearch>
+                  <Divider />
                   <SelectList>
                     {namespaceNames.map((ns) => (
                       <SelectOption key={ns} value={ns}>
                         {ns}
                       </SelectOption>
                     ))}
+                    {namespaceNames.length === 0 && (
+                      <SelectOption isDisabled value="">
+                        {t('No matching namespaces')}
+                      </SelectOption>
+                    )}
                   </SelectList>
                 </Select>
+                <FormHelperText>
+                  <HelperText>
+                    <HelperTextItem>
+                      {t('Select the namespace first. NADs will be filtered to this namespace.')}
+                    </HelperTextItem>
+                  </HelperText>
+                </FormHelperText>
+              </FormGroup>
+
+              <FormGroup label={t('Network Attachment Definition')} fieldId="netdhcp-nad" isRequired>
+                <Select
+                  id="netdhcp-nad"
+                  isOpen={nadSelectOpen}
+                  onOpenChange={(open) => {
+                    setNadSelectOpen(open);
+                    if (!open) setNadFilter('');
+                  }}
+                  onSelect={(_e, value) => {
+                    setSelectedNad(value as string);
+                    setNadSelectOpen(false);
+                    setNadFilter('');
+                    setNameManual(false);
+                  }}
+                  selected={selectedNad}
+                  toggle={(toggleRef) => (
+                    <MenuToggle
+                      ref={toggleRef}
+                      onClick={() => setNadSelectOpen(!nadSelectOpen)}
+                      isExpanded={nadSelectOpen}
+                      isDisabled={!targetNamespace}
+                      style={{ width: '100%' }}
+                    >
+                      {selectedNad || (targetNamespace ? t('Select a NAD') : t('Select a namespace first'))}
+                    </MenuToggle>
+                  )}
+                >
+                  <MenuSearch>
+                    <MenuSearchInput>
+                      <SearchInput
+                        value={nadFilter}
+                        onChange={(_e, val) => setNadFilter(val)}
+                        onClear={() => setNadFilter('')}
+                        placeholder={t('Filter NADs...')}
+                        aria-label={t('Filter NADs')}
+                      />
+                    </MenuSearchInput>
+                  </MenuSearch>
+                  <Divider />
+                  <SelectList>
+                    {nadOptions.map((opt) => (
+                      <SelectOption
+                        key={opt.key}
+                        value={opt.key}
+                        description={opt.description}
+                      >
+                        {opt.key}
+                      </SelectOption>
+                    ))}
+                    {nadOptions.length === 0 && (
+                      <SelectOption isDisabled value="">
+                        {targetNamespace
+                          ? t('No NADs found in {{namespace}}', { namespace: targetNamespace })
+                          : t('No NADs found')}
+                      </SelectOption>
+                    )}
+                  </SelectList>
+                </Select>
+                <FormHelperText>
+                  <HelperText>
+                    <HelperTextItem>
+                      {t('The NAD network where the DHCP server will operate. Filtered to the selected namespace.')}
+                    </HelperTextItem>
+                  </HelperText>
+                </FormHelperText>
               </FormGroup>
             </Form>
           </CardBody>
