@@ -68,3 +68,38 @@ export const PodModel: K8sModel = {
   plural: 'pods',
   namespaced: true,
 };
+
+/** Core v1 ServiceAccount. */
+export const ServiceAccountModel: K8sModel = {
+  apiVersion: 'v1',
+  kind: 'ServiceAccount',
+  abbr: 'SA',
+  label: 'ServiceAccount',
+  labelPlural: 'ServiceAccounts',
+  plural: 'serviceaccounts',
+  namespaced: true,
+};
+
+/** RBAC v1 ClusterRole. */
+export const ClusterRoleModel: K8sModel = {
+  apiVersion: 'v1',
+  apiGroup: 'rbac.authorization.k8s.io',
+  kind: 'ClusterRole',
+  abbr: 'CR',
+  label: 'ClusterRole',
+  labelPlural: 'ClusterRoles',
+  plural: 'clusterroles',
+  namespaced: false,
+};
+
+/** RBAC v1 ClusterRoleBinding. */
+export const ClusterRoleBindingModel: K8sModel = {
+  apiVersion: 'v1',
+  apiGroup: 'rbac.authorization.k8s.io',
+  kind: 'ClusterRoleBinding',
+  abbr: 'CRB',
+  label: 'ClusterRoleBinding',
+  labelPlural: 'ClusterRoleBindings',
+  plural: 'clusterrolebindings',
+  namespaced: false,
+};

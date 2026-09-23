@@ -37,13 +37,15 @@ import {
 } from '@patternfly/react-core';
 import React, { FC, useCallback, useEffect, useMemo, useState } from 'react';
 
-import { ConfigMapModel, DeploymentModel } from '../utils/k8s-resources';
+import { ConfigMapModel, DeploymentModel, ServiceAccountModel, ClusterRoleBindingModel } from '../utils/k8s-resources';
 import {
   DhcpServerConfig,
   NetworkAttachmentDefinitionKind,
   NamespaceKind,
   buildDhcpConfigMap,
   buildDhcpDeployment,
+  buildDhcpServiceAccount,
+  buildDhcpSccRoleBinding,
   cidrToNetmask,
   getK8sErrorMessage,
   isOvnNad,
@@ -179,6 +181,14 @@ const CreateDhcpTab: FC<CreateDhcpTabProps> = ({ nads, namespaces }) => {
   const previewContent = useMemo(() => {
     if (!canCreate || !selectedNadObj) return '';
     const config = buildConfig();
+    const sa = buildDhcpServiceAccount({
+      name: serverName.trim(),
+      namespace: targetNamespace,
+    });
+    const crb = buildDhcpSccRoleBinding({
+      name: serverName.trim(),
+      namespace: targetNamespace,
+    });
     const cm = buildDhcpConfigMap({
       name: serverName.trim(),
       namespace: targetNamespace,
@@ -196,6 +206,10 @@ const CreateDhcpTab: FC<CreateDhcpTabProps> = ({ nads, namespaces }) => {
       configMapName: serverName.trim(),
     });
     return (
+      toYaml(sa as Record<string, unknown>) +
+      '---\n' +
+      toYaml(crb as Record<string, unknown>) +
+      '---\n' +
       toYaml(cm as Record<string, unknown>) +
       '---\n' +
       toYaml(dep as Record<string, unknown>)
@@ -226,6 +240,28 @@ const CreateDhcpTab: FC<CreateDhcpTabProps> = ({ nads, namespaces }) => {
         serverIp,
         netmask: cidrToNetmask(cidrPrefix),
         configMapName: serverName.trim(),
+      });
+
+      const saData = buildDhcpServiceAccount({
+        name: serverName.trim(),
+        namespace: targetNamespace,
+      });
+      const crbData = buildDhcpSccRoleBinding({
+        name: serverName.trim(),
+        namespace: targetNamespace,
+      });
+
+      dashboardLogger.info(LOG_ACTION, 'Creating ServiceAccount', `${targetNamespace}/${serverName.trim()}`);
+      await k8sCreate({
+        model: ServiceAccountModel,
+        data: saData as unknown as K8sResourceCommon,
+        ns: targetNamespace,
+      });
+
+      dashboardLogger.info(LOG_ACTION, 'Creating ClusterRoleBinding for anyuid SCC', serverName.trim());
+      await k8sCreate({
+        model: ClusterRoleBindingModel,
+        data: crbData as unknown as K8sResourceCommon,
       });
 
       dashboardLogger.info(LOG_ACTION, 'Creating ConfigMap', `${targetNamespace}/${serverName.trim()}`);
@@ -632,11 +668,11 @@ const CreateDhcpTab: FC<CreateDhcpTabProps> = ({ nads, namespaces }) => {
 
               <StackItem>
                 <Alert
-                  variant="warning"
+                  variant="info"
                   isInline
                   title={t('NET_RAW capability')}
                 >
-                  {t('The DHCP server deployment requires NET_RAW capability for dnsmasq raw sockets. Ensure your cluster security policy allows this.')}
+                  {t('The DHCP server will be granted the anyuid SCC via a ClusterRoleBinding to allow dnsmasq raw sockets (NET_RAW capability). The binding is automatically cleaned up when the server is deleted.')}
                 </Alert>
               </StackItem>
 

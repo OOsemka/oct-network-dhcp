@@ -28,12 +28,13 @@ import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
 import { NetworkIcon, TrashIcon } from '@patternfly/react-icons';
 import React, { FC, useCallback, useMemo, useState } from 'react';
 
-import { ConfigMapModel, DeploymentModel } from '../utils/k8s-resources';
+import { ConfigMapModel, DeploymentModel, ClusterRoleBindingModel } from '../utils/k8s-resources';
 import {
   DhcpReservation,
   DhcpServerConfig,
   DhcpServerInventoryItem,
   VirtualMachineInstanceKind,
+  dhcpClusterRoleBindingName,
   discoverVmsOnNad,
   generateDnsmasqConf,
   getK8sErrorMessage,
@@ -206,6 +207,25 @@ const ManageDhcpTab: FC<ManageDhcpTabProps> = ({ inventory, vmis, rawConfigMaps 
           metadata: { name: deleteTarget.configMapName, namespace: deleteTarget.namespace },
         },
       });
+
+      const crbName = dhcpClusterRoleBindingName(deleteTarget.name, deleteTarget.namespace);
+      dashboardLogger.info(LOG_ACTION, 'Deleting ClusterRoleBinding', crbName);
+      try {
+        await k8sDelete({
+          model: ClusterRoleBindingModel,
+          resource: {
+            apiVersion: 'rbac.authorization.k8s.io/v1',
+            kind: 'ClusterRoleBinding',
+            metadata: { name: crbName },
+          },
+        });
+      } catch (crbErr) {
+        const crbMsg = getK8sErrorMessage(crbErr);
+        if (!crbMsg.includes('not found') && !crbMsg.includes('404')) {
+          throw crbErr;
+        }
+        dashboardLogger.info(LOG_ACTION, 'ClusterRoleBinding already absent', crbName);
+      }
 
       dashboardLogger.info(LOG_ACTION, 'Delete succeeded', deleteTarget.name);
       if (selectedServer === deleteTarget.name) {
@@ -612,7 +632,7 @@ const ManageDhcpTab: FC<ManageDhcpTabProps> = ({ inventory, vmis, rawConfigMaps 
           {deleteTarget && (
             <Stack hasGutter>
               <StackItem>
-                {t('Delete DHCP server {{name}} in {{namespace}}? This will remove the Deployment and ConfigMap.', {
+                {t('Delete DHCP server {{name}} in {{namespace}}? This will remove the Deployment, ConfigMap, and the anyuid SCC ClusterRoleBinding.', {
                   name: deleteTarget.name,
                   namespace: deleteTarget.namespace,
                 })}

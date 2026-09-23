@@ -289,6 +289,62 @@ export function buildDhcpConfigMap(opts: {
   };
 }
 
+export function dhcpServiceAccountName(serverName: string): string {
+  return `dhcp-${serverName}`.slice(0, 253);
+}
+
+export function dhcpClusterRoleBindingName(serverName: string, namespace: string): string {
+  return `oct-dhcp-${serverName}-${namespace}`.slice(0, 253);
+}
+
+export function buildDhcpServiceAccount(opts: {
+  name: string;
+  namespace: string;
+}): Record<string, unknown> {
+  const saName = dhcpServiceAccountName(opts.name);
+  return {
+    apiVersion: 'v1',
+    kind: 'ServiceAccount',
+    metadata: {
+      name: saName,
+      namespace: opts.namespace,
+      labels: {
+        'app.kubernetes.io/managed-by': MANAGED_BY,
+      },
+    },
+  };
+}
+
+export function buildDhcpSccRoleBinding(opts: {
+  name: string;
+  namespace: string;
+}): Record<string, unknown> {
+  const saName = dhcpServiceAccountName(opts.name);
+  const crbName = dhcpClusterRoleBindingName(opts.name, opts.namespace);
+  return {
+    apiVersion: 'rbac.authorization.k8s.io/v1',
+    kind: 'ClusterRoleBinding',
+    metadata: {
+      name: crbName,
+      labels: {
+        'app.kubernetes.io/managed-by': MANAGED_BY,
+      },
+    },
+    roleRef: {
+      apiGroup: 'rbac.authorization.k8s.io',
+      kind: 'ClusterRole',
+      name: 'system:openshift:scc:anyuid',
+    },
+    subjects: [
+      {
+        kind: 'ServiceAccount',
+        name: saName,
+        namespace: opts.namespace,
+      },
+    ],
+  };
+}
+
 export function buildDhcpDeployment(opts: {
   name: string;
   namespace: string;
@@ -340,6 +396,7 @@ export function buildDhcpDeployment(opts: {
           },
         },
         spec: {
+          serviceAccountName: dhcpServiceAccountName(opts.name),
           containers: [
             {
               name: 'dnsmasq',
