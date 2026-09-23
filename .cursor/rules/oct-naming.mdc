@@ -1,0 +1,33 @@
+---
+description: OCT naming — oct-<name> IDs, images, dirs; community project, not Red Hat supported
+alwaysApply: true
+---
+
+# OCT naming
+
+OpenShift Community Tools (OCT) is a **community project**, not officially supported by Red Hat. Never describe it as official Red Hat software.
+
+## Prefix
+
+Directories, `package.json` `consolePlugin.name`, ConsolePlugin CR, image repos, and catalog `metadata.name` / `spec.consolePlugin` use **`oct-<extension-name>`**:
+
+| Module | Directory | Plugin ID |
+| --- | --- | --- |
+| Storefront | `oct-storefront` | `oct-storefront` |
+| Bare Metal Hosts | `oct-baremetal` | `oct-baremetal` |
+| Network Bond | `oct-network-bond` | `oct-network-bond` |
+| Network VLAN | `oct-network-vlan` | `oct-network-vlan` |
+| Network Bridge | `oct-network-bridge` | `oct-network-bridge` |
+| Network DHCP | `oct-network-dhcp` | `oct-network-dhcp` |
+
+i18n: `locales/en/plugin__<plugin-id>.json`. Proxy: `/api/proxy/plugin/<plugin-id>/<alias>`.
+
+## Navigation
+
+Left-nav section is **Community Tools** (`id: community-tools`). Hubs: Compute, Storage, Network, Management. Extensions must not register that section.
+
+```json
+{ "consolePlugin": { "name": "oct-network-dhcp" } }
+```
+
+Old IDs need a cluster reinstall. Do not `oc apply` unless asked.

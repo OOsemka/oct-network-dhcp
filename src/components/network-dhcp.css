@@ -1,0 +1,43 @@
+/* Network DHCP tool. Prefix: netdhcp- */
+
+.netdhcp-lead {
+  max-width: 48rem;
+  color: var(--pf-t--global--text--color--subtle, #6a6e73);
+}
+
+.netdhcp-table-wrap {
+  overflow: auto;
+  max-height: 28rem;
+}
+
+.netdhcp-review-yaml {
+  max-height: 24rem;
+  overflow: auto;
+}
+
+.netdhcp-actions {
+  padding-top: var(--pf-t--global--spacer--md, 16px);
+}
+
+.netdhcp-detail-panel {
+  margin-top: var(--pf-t--global--spacer--md, 16px);
+}
+
+.netdhcp-reservation-row {
+  display: flex;
+  align-items: center;
+  gap: var(--pf-t--global--spacer--sm, 8px);
+  margin-bottom: var(--pf-t--global--spacer--sm, 8px);
+}
+
+.netdhcp-inline-fields {
+  display: flex;
+  gap: var(--pf-t--global--spacer--sm, 8px);
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.netdhcp-inline-fields > * {
+  flex: 1;
+  min-width: 120px;
+}

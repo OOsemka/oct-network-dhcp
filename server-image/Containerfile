@@ -1,0 +1,8 @@
+FROM docker.io/library/node:20-alpine AS base
+RUN apk add --no-cache dnsmasq && \
+    mkdir -p /var/lib/dnsmasq /etc/dnsmasq.d && \
+    chmod 777 /var/lib/dnsmasq
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+USER 1001
+ENTRYPOINT ["/entrypoint.sh"]
