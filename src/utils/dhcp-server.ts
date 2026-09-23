@@ -89,7 +89,7 @@ export type DhcpServerInventoryItem = {
 /* ------------------------------------------------------------------ */
 
 const MANAGED_BY = 'oct-network-dhcp';
-const DHCP_SERVER_IMAGE = 'quay.io/cjanisze/oct-network-dhcp-server:1.0.0-ocp4.22';
+const DHCP_SERVER_IMAGE = 'quay.io/cjanisze/oct-network-dhcp-server:1.0.1-ocp4.22';
 const DHCP_SCC_NAME = 'oct-dhcp-netraw';
 const DHCP_CLUSTERROLE_NAME = 'oct-dhcp-netraw-use';
 
@@ -454,6 +454,10 @@ export function buildDhcpDeployment(opts: {
             {
               name: 'dnsmasq',
               image,
+              env: [
+                { name: 'SERVER_IP', value: opts.serverIp },
+                { name: 'CIDR_PREFIX', value: String(prefix) },
+              ],
               volumeMounts: [
                 {
                   name: 'dnsmasq-config',
