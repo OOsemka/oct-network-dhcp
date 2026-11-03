@@ -29,13 +29,14 @@ import { Table, Thead, Tr, Th, Tbody, Td } from '@patternfly/react-table';
 import { NetworkIcon, TrashIcon } from '@patternfly/react-icons';
 import React, { FC, useCallback, useMemo, useState } from 'react';
 
-import { ConfigMapModel, DeploymentModel, ClusterRoleBindingModel } from '../utils/k8s-resources';
+import { ConfigMapModel, DeploymentModel, ClusterRoleBindingModel, ServiceAccountModel } from '../utils/k8s-resources';
 import {
   DhcpReservation,
   DhcpServerConfig,
   DhcpServerInventoryItem,
   VirtualMachineInstanceKind,
   dhcpClusterRoleBindingName,
+  dhcpServiceAccountName,
   discoverVmsOnNad,
   generateDnsmasqConf,
   getK8sErrorMessage,
@@ -216,6 +217,25 @@ const ManageDhcpTab: FC<ManageDhcpTabProps> = ({ inventory, vmis, rawConfigMaps 
           throw crbErr;
         }
         dashboardLogger.info(LOG_ACTION, 'ClusterRoleBinding already absent', crbName);
+      }
+
+      const saName = dhcpServiceAccountName(deleteTarget.name);
+      dashboardLogger.info(LOG_ACTION, 'Deleting ServiceAccount', `${deleteTarget.namespace}/${saName}`);
+      try {
+        await k8sDelete({
+          model: ServiceAccountModel,
+          resource: {
+            apiVersion: 'v1',
+            kind: 'ServiceAccount',
+            metadata: { name: saName, namespace: deleteTarget.namespace },
+          },
+        });
+      } catch (saErr) {
+        const saMsg = getK8sErrorMessage(saErr);
+        if (!saMsg.includes('not found') && !saMsg.includes('404')) {
+          throw saErr;
+        }
+        dashboardLogger.info(LOG_ACTION, 'ServiceAccount already absent', saName);
       }
 
       dashboardLogger.info(LOG_ACTION, 'Delete succeeded', deleteTarget.name);
@@ -538,7 +558,7 @@ const ManageDhcpTab: FC<ManageDhcpTabProps> = ({ inventory, vmis, rawConfigMaps 
                     <Td isActionCell>
                       <Button
                         variant="primary"
-                        isSmall
+                        size="sm"
                         onClick={() => addReservationFromVm(vm)}
                       >
                         {t('Add')}

@@ -281,18 +281,29 @@ const CreateDhcpTab: FC<CreateDhcpTabProps> = ({ nads, namespaces }) => {
         if (!(crErr as { code?: number })?.code || (crErr as { code: number }).code !== 409) throw crErr;
       }
 
-      dashboardLogger.info(LOG_ACTION, 'Creating ServiceAccount', `${targetNamespace}/${serverName.trim()}`);
-      await k8sCreate({
-        model: ServiceAccountModel,
-        data: saData as unknown as K8sResourceCommon,
-        ns: targetNamespace,
-      });
+      // The per-server ServiceAccount and ClusterRoleBinding are identical for a
+      // given name: keep one left over from an earlier server (409) instead of
+      // failing. Releases up to 1.0.5 did not delete the ServiceAccount.
+      dashboardLogger.info(LOG_ACTION, 'Ensuring ServiceAccount', `${targetNamespace}/${serverName.trim()}`);
+      try {
+        await k8sCreate({
+          model: ServiceAccountModel,
+          data: saData as unknown as K8sResourceCommon,
+          ns: targetNamespace,
+        });
+      } catch (saErr: unknown) {
+        if ((saErr as { code?: number })?.code !== 409) throw saErr;
+      }
 
-      dashboardLogger.info(LOG_ACTION, 'Creating ClusterRoleBinding for DHCP SCC', serverName.trim());
-      await k8sCreate({
-        model: ClusterRoleBindingModel,
-        data: crbData as unknown as K8sResourceCommon,
-      });
+      dashboardLogger.info(LOG_ACTION, 'Ensuring ClusterRoleBinding for DHCP SCC', serverName.trim());
+      try {
+        await k8sCreate({
+          model: ClusterRoleBindingModel,
+          data: crbData as unknown as K8sResourceCommon,
+        });
+      } catch (crbErr: unknown) {
+        if ((crbErr as { code?: number })?.code !== 409) throw crbErr;
+      }
 
       dashboardLogger.info(LOG_ACTION, 'Creating ConfigMap', `${targetNamespace}/${serverName.trim()}`);
       await k8sCreate({
