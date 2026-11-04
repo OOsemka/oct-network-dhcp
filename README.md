@@ -30,6 +30,8 @@ yarn build
 
 Deploy: edit the image in `deploy/install.yaml`, `oc apply -f deploy/install.yaml` (only when asked), then enable `oct-network-dhcp` in `consoles.operator.openshift.io/cluster` `spec.plugins` (or use the storefront **Add** action).
 
-## Contributing — cluster-portable code
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md): setup, `yarn verify`, testing on your own cluster, the project rules and what maintainers do at release.
 
 Do **not** hardcode environment-specific values (IPs, CIDRs, NAD names, StorageClasses, hostnames). The UI reads live NADs and VMIs; the user supplies the DHCP configuration. Agents: `.cursor/rules/oct-no-env-hardcoding.mdc`.

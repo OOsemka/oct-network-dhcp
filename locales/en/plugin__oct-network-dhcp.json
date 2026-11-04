@@ -82,5 +82,17 @@
   "Add": "Add",
   "Add Manual Reservation": "Add Manual Reservation",
   "MAC Address": "MAC Address",
-  "IP Address": "IP Address"
+  "IP Address": "IP Address",
+  "Network Selection": "Network Selection",
+  "Filter namespaces...": "Filter namespaces...",
+  "Filter namespaces": "Filter namespaces",
+  "No matching namespaces": "No matching namespaces",
+  "Select the namespace first. NADs will be filtered to this namespace.": "Select the namespace first. NADs will be filtered to this namespace.",
+  "Select a namespace first": "Select a namespace first",
+  "Filter NADs...": "Filter NADs...",
+  "Filter NADs": "Filter NADs",
+  "No NADs found in {{namespace}}": "No NADs found in {{namespace}}",
+  "The NAD network where the DHCP server will operate. Filtered to the selected namespace.": "The NAD network where the DHCP server will operate. Filtered to the selected namespace.",
+  "VM candidates": "VM candidates",
+  "Delete DHCP server {{name}} in {{namespace}}? This will remove the Deployment, ConfigMap, and the anyuid SCC ClusterRoleBinding.": "Delete DHCP server {{name}} in {{namespace}}? This will remove the Deployment, ConfigMap, and the anyuid SCC ClusterRoleBinding."
 }
